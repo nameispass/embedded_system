@@ -1,0 +1,52 @@
+menu "Temperature Monitor Configuration"
+
+    config DHT_GPIO
+        int "DHT22 GPIO number"
+        range 0 21
+        default 4
+        help
+            GPIO number for DHT22 data pin.
+
+    config BUZZER_GPIO
+        int "Buzzer GPIO number"
+        range 0 21
+        default 5
+        help
+            GPIO number for Buzzer control.
+
+    config LED_GPIO
+        int "LED GPIO number"
+        range 0 21
+        default 2
+        help
+            GPIO number for LED indicator.
+
+    config I2C_SDA_GPIO
+        int "I2C SDA GPIO number"
+        range 0 21
+        default 8
+        help
+            GPIO number for I2C SDA (OLED).
+
+    config I2C_SCL_GPIO
+        int "I2C SCL GPIO number"
+        range 0 21
+        default 9
+        help
+            GPIO number for I2C SCL (OLED).
+
+    config TEMP_WARNING_THRESHOLD
+        int "Warning temperature threshold (Celsius)"
+        range 20 60
+        default 35
+        help
+            Temperature threshold for warning state.
+
+    config TEMP_OVERHEAT_THRESHOLD
+        int "Overheat temperature threshold (Celsius)"
+        range 30 80
+        default 45
+        help
+            Temperature threshold for overheat state.
+
+endmenu
