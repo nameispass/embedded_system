@@ -257,7 +257,7 @@ source ~/.bashrc
 
 ```bash
 # Clone với Git
-git clone https://github.com/yourusername/temp-monitor-esp32c3.git
+git clone https://github.com/nameispass/embedded_system.git
 cd temp-monitor-esp32c3
 
 # Hoặc download ZIP và giải nén
@@ -724,5 +724,6 @@ idf.py -p /dev/ttyUSB0 monitor -b 115200
 - **Nhóm Mephisto**
 - Học kỳ 9 - 2025
 - Trường: Đại học Bách khoa - Đại học Đà Nẵng
+
 
 
