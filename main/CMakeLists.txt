@@ -3,10 +3,18 @@ idf_component_register(
         "main.c"
         "dht22.c"
         "ssd1306.c"
+        "webserver.c"
+        "wifi.c"
     INCLUDE_DIRS 
         "."
     REQUIRES 
         driver
         esp_timer
+        esp_http_server
+        esp_wifi
+        esp_netif
+        esp_event
+    PRIV_REQUIRES
+        nvs_flash
 )
 

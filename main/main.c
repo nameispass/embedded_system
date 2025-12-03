@@ -1,12 +1,15 @@
 /**
  * @file main.c
- * @brief Hệ thống Giám sát Nhiệt độ - ESP-IDF FreeRTOS (FULL FEATURES)
+ * @brief Hệ thống Giám sát Nhiệt độ - ESP-IDF FreeRTOS (FULL FEATURES + WEBSERVER)
  * @features Tasks, Queues, Software Timers, Mutex, Semaphores, Event Groups, Task Notifications
+ * @webserver HTTP REST API, WiFi connectivity, Web Dashboard
  */
 
 #include "config.h"
 #include "dht22.h"
 #include "ssd1306.h"
+#include "webserver.h"
+#include "wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -67,6 +70,16 @@ const char* get_state_string(system_state_t state) {
     }
 }
 
+/**
+ * @brief Lấy trạng thái buzzer (ON nếu timer đang chạy, OFF nếu không)
+ */
+bool get_buzzer_status(void) {
+    if (buzzer_timer == NULL) {
+        return false;
+    }
+    return (xTimerIsTimerActive(buzzer_timer) != pdFALSE);
+}
+
 // ==================== SOFTWARE TIMER CALLBACKS ====================
 
 /**
@@ -80,11 +93,11 @@ void sensor_timer_callback(TimerHandle_t xTimer) {
 }
 
 /**
- * @brief Timer callback: Tắt buzzer sau 5 giây
+ * @brief Timer callback: Tắt buzzer sau 10 giây
  */
 void buzzer_timer_callback(TimerHandle_t xTimer) {
     gpio_set_level(BUZZER_PIN, 0);
-    ESP_LOGI(TAG, "Buzzer auto-off after 5s");
+    ESP_LOGI(TAG, "Buzzer auto-off after 10s");
 }
 
 // ==================== TASK IMPLEMENTATIONS ====================
@@ -138,6 +151,11 @@ void sensor_task(void *pvParameters) {
                 
                 // Signal semaphore báo có dữ liệu mới
                 xSemaphoreGive(data_ready_semaphore);
+                
+                // ========== CẬP NHẬT WEBSERVER ==========
+                #if ENABLE_WEBSERVER
+                webserver_update_sensor_data(&data, new_state);
+                #endif
                 
             } else {
                 data.is_valid = false;
@@ -246,48 +264,57 @@ void alert_task(void *pvParameters) {
                 new_state = STATE_NORMAL;
             }
             
-            // Chỉ cập nhật khi trạng thái thay đổi
-            if (new_state != last_state) {
-                last_state = new_state;
-                
-                switch (new_state) {
-                    case STATE_OVERHEAT:
-                        // NGUY HIỂM: Bật buzzer và LED
+            // Xử lý từng trạng thái (kể cả khi không thay đổi)
+            switch (new_state) {
+                case STATE_OVERHEAT:
+                    // NGUY HIỂM: Bật buzzer và LED
+                    gpio_set_level(LED_PIN, 1);
+                    
+                    // Kêu buzzer chu kỳ: Nếu timer hết → bắt đầu lại
+                    if (xTimerIsTimerActive(buzzer_timer) == pdFALSE) {
                         gpio_set_level(BUZZER_PIN, 1);
-                        gpio_set_level(LED_PIN, 1);
-                        
-                        // Khởi động timer tự động tắt buzzer sau 5s
                         xTimerStart(buzzer_timer, 0);
                         
-                        ESP_LOGW(TAG, "🚨 ALERT: OVERHEAT! Buzzer ON");
-                        break;
-                        
-                    case STATE_WARNING:
-                        // CẢNH BÁO: Tắt buzzer, bật LED
-                        gpio_set_level(BUZZER_PIN, 0);
-                        gpio_set_level(LED_PIN, 1);
-                        
-                        // Dừng timer buzzer
-                        xTimerStop(buzzer_timer, 0);
-                        
+                        if (new_state != last_state) {
+                            ESP_LOGW(TAG, "🚨 ALERT: OVERHEAT! Buzzer ON (cycle 1)");
+                        } else {
+                            ESP_LOGW(TAG, "🔔 OVERHEAT: Buzzer ON (cycle repeat)");
+                        }
+                    }
+                    break;
+                    
+                case STATE_WARNING:
+                    // CẢNH BÁO: Tắt buzzer, bật LED
+                    gpio_set_level(BUZZER_PIN, 0);
+                    gpio_set_level(LED_PIN, 1);
+                    
+                    // Dừng timer buzzer
+                    xTimerStop(buzzer_timer, 0);
+                    
+                    if (new_state != last_state) {
                         ESP_LOGW(TAG, "⚠ ALERT: WARNING! LED ON");
-                        break;
-                        
-                    case STATE_NORMAL:
-                        // BÌNH THƯỜNG: Tắt cả hai
-                        gpio_set_level(BUZZER_PIN, 0);
-                        gpio_set_level(LED_PIN, 0);
-                        
-                        // Dừng timer buzzer
-                        xTimerStop(buzzer_timer, 0);
-                        
+                    }
+                    break;
+                    
+                case STATE_NORMAL:
+                    // BÌNH THƯỜNG: Tắt cả hai
+                    gpio_set_level(BUZZER_PIN, 0);
+                    gpio_set_level(LED_PIN, 0);
+                    
+                    // Dừng timer buzzer
+                    xTimerStop(buzzer_timer, 0);
+                    
+                    if (new_state != last_state) {
                         ESP_LOGI(TAG, "✓ ALERT: NORMAL");
-                        break;
-                        
-                    default:
-                        break;
-                }
+                    }
+                    break;
+                    
+                default:
+                    break;
             }
+            
+            // Cập nhật last_state sau khi xử lý
+            last_state = new_state;
         }
     }
 }
@@ -297,9 +324,9 @@ void alert_task(void *pvParameters) {
  */
 void app_main(void) {
     ESP_LOGI(TAG, "\n╔════════════════════════════════════════════════════════╗");
-    ESP_LOGI(TAG, "║   TEMPERATURE MONITORING SYSTEM - FULL FREERTOS      ║");
-    ESP_LOGI(TAG, "║   Tasks | Queues | Timers | Mutex | Semaphores       ║");
-    ESP_LOGI(TAG, "║   Event Groups | Task Notifications                  ║");
+    ESP_LOGI(TAG, "║  TEMPERATURE MONITORING SYSTEM + WEBSERVER           ║");
+    ESP_LOGI(TAG, "║  Tasks | Queues | Timers | Mutex | Semaphores       ║");
+    ESP_LOGI(TAG, "║  Event Groups | Task Notifications | WiFi + HTTP     ║");
     ESP_LOGI(TAG, "╚════════════════════════════════════════════════════════╝\n");
     
     // ==================== KHỞI TẠO PHẦN CỨNG ====================
@@ -336,6 +363,28 @@ void app_main(void) {
     dht22_init();
     vTaskDelay(pdMS_TO_TICKS(2000));
     ESP_LOGI(TAG, "✓ DHT22 initialized (GPIO=%d)", DHT_PIN);
+    
+    // ==================== KHỞI TẠO WiFi VÀ WEBSERVER ====================
+    
+    #if ENABLE_WEBSERVER
+    ESP_LOGI(TAG, "\n--- WiFi & Webserver Initialization ---\n");
+    
+    // Khởi tạo WiFi (blocking - đợi kết nối)
+    if (wifi_init_sta() == ESP_OK) {
+        ESP_LOGI(TAG, "✓ WiFi connected!");
+        ESP_LOGI(TAG, "  IP Address: %s", wifi_get_ip_address());
+        
+        // Khởi tạo HTTP Server
+        if (webserver_init() == ESP_OK) {
+            ESP_LOGI(TAG, "✓ Webserver initialized!");
+            ESP_LOGI(TAG, "  Open browser: http://%s", wifi_get_ip_address());
+        } else {
+            ESP_LOGE(TAG, "✗ Failed to initialize webserver!");
+        }
+    } else {
+        ESP_LOGW(TAG, "⚠ WiFi connection failed, but system continues...");
+    }
+    #endif
     
     // ==================== TẠO FREERTOS OBJECTS ====================
     
@@ -390,7 +439,7 @@ void app_main(void) {
     // 6. Software Timer - Tắt buzzer sau 5 giây
     buzzer_timer = xTimerCreate(
         "BuzzerTimer",                      // Tên timer
-        pdMS_TO_TICKS(5000),                // 5 giây
+        pdMS_TO_TICKS(10000),               // 10 giây
         pdFALSE,                            // One-shot (không auto-reload)
         (void *)1,                          // Timer ID
         buzzer_timer_callback               // Callback
@@ -399,7 +448,7 @@ void app_main(void) {
         ESP_LOGE(TAG, "✗ Failed to create buzzer timer!");
         return;
     }
-    ESP_LOGI(TAG, "✓ Buzzer Timer created (5s auto-off)");
+    ESP_LOGI(TAG, "✓ Buzzer Timer created (10s auto-off)");
     
     // ==================== TẠO TASKS ====================
     
@@ -454,5 +503,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "║  📊 Sensor reading every 1s                           ║");
     ESP_LOGI(TAG, "║  🖥  Display updates on new data                      ║");
     ESP_LOGI(TAG, "║  🔔 Alerts via Event Group + Timer                    ║");
+    #if ENABLE_WEBSERVER
+    ESP_LOGI(TAG, "║  🌐 Webserver: http://%s                              ║", wifi_get_ip_address());
+    #endif
     ESP_LOGI(TAG, "╚════════════════════════════════════════════════════════╝\n");
 }

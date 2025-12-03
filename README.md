@@ -25,7 +25,7 @@ Dự án hệ thống giám sát nhiệt độ và độ ẩm sử dụng **ESP3
 
 ## 🎯 Tổng quan
 
-Dự án xây dựng hệ thống giám sát nhiệt độ – độ ẩm sử dụng **FreeRTOS** và **ESP32-C3**. Hệ thống đọc dữ liệu từ cảm biến DHT22 theo chu kỳ 1 giây bằng Software Timer, hiển thị lên màn hình OLED SSD1306, và cảnh báo qua buzzer khi nhiệt độ vượt ngưỡng.
+Dự án xây dựng hệ thống giám sát nhiệt độ – độ ẩm sử dụng **FreeRTOS** và **ESP32-C3**. Hệ thống đọc dữ liệu từ cảm biến DHT22 theo chu kỳ 1 giây bằng Software Timer, hiển thị lên màn hình OLED SSD1306, cảnh báo qua buzzer khi nhiệt độ vượt ngưỡng, và cung cấp **Web Dashboard** để giám sát từ trình duyệt.
 
 ### Đặc điểm nổi bật:
 - ✅ Sử dụng **đầy đủ** các tính năng FreeRTOS
@@ -33,6 +33,8 @@ Dự án xây dựng hệ thống giám sát nhiệt độ – độ ẩm sử d
 - ✅ Bảo vệ tài nguyên dùng chung với **Mutex**
 - ✅ Quản lý trạng thái thông minh với **Event Groups**
 - ✅ Tiết kiệm năng lượng với **Software Timers**
+- ✅ **Web Dashboard** giám sát real-time từ trình duyệt
+- ✅ **REST API** để lấy/cập nhật dữ liệu từ ứng dụng khác
 
 ---
 
@@ -114,6 +116,17 @@ Quản lý các trạng thái hệ thống:
   - Thay đổi trạng thái
   - Thống kê hệ thống
   - Debug information
+
+### 🌐 Web Server & REST API
+- **HTTP Server** trên port 80
+- **Web Dashboard** HTML responsive
+- **REST API endpoints** để lấy/cập nhật dữ liệu:
+  - GET /api/sensor - Dữ liệu nhiệt độ & độ ẩm
+  - GET /api/buzzer - Trạng thái buzzer (ON/OFF)
+  - GET /api/config - Cấu hình hệ thống
+  - POST /api/config - Cập nhật ngưỡng cảnh báo
+- **Real-time updates** mỗi 2 giây từ trình duyệt
+- Giao diện tối (dark mode) dễ nhìn trên di động
 
 ### 🔄 Chuyển trạng thái tự động
 
@@ -257,8 +270,8 @@ source ~/.bashrc
 
 ```bash
 # Clone với Git
-git clone https://github.com/nameispass/embedded_system.git
-cd embedded_system
+git clone https://github.com/yourusername/temp-monitor-esp32c3.git
+cd temp-monitor-esp32c3
 
 # Hoặc download ZIP và giải nén
 ```
@@ -405,6 +418,72 @@ I (1350) DISPLAY: Updated: T=25.3, H=65.0, State=NORMAL
 I (2345) SENSOR: T: 25.4°C, H: 64.8%
 ```
 
+### 🌐 Giao diện Web Dashboard
+
+Hệ thống cung cấp **Web Dashboard** để giám sát nhiệt độ từ trình duyệt.
+
+#### Truy cập Dashboard
+1. Kết nối ESP32-C3 với WiFi (SSID: "xxxx", mật khẩu: "xxxx")
+2. Mở serial monitor để xem IP address (ví dụ: `x.x.x.x`)
+3. Truy cập: `http://x.x.x.x` trong trình duyệt
+
+#### Các phần trong Dashboard
+
+**1. 📊 Sensor Data (Dữ liệu Cảm biến)**
+- Nhiệt độ (°C) - hiển thị real-time
+- Độ ẩm (%) - hiển thị real-time
+- Trạng thái hệ thống:
+  - 🟢 **NORMAL**: Nhiệt độ bình thường (màu xanh)
+  - 🟡 **WARNING**: Cảnh báo, cần theo dõi (màu vàng)
+  - 🔴 **DANGER**: Quá nhiệt, cần hành động (màu đỏ)
+
+**2. 📯 Buzzer Status (Trạng thái Buzzer)**
+- Hiển thị trạng thái buzzer theo thời gian thực
+- 🟢 **OFF** (màu xanh): Buzzer đang tắt
+- 🔴 **ON** (màu đỏ): Buzzer đang phát âm thanh
+
+**3. ⚙️ Configuration (Cấu hình)**
+- Hiển thị ngưỡng cảnh báo (Warning) và quá nhiệt (Overheat)
+- Cho phép điều chỉnh ngưỡng:
+  - Nhập giá trị mới vào các trường `Warning` và `Overheat`
+  - Nhấn nút **"Update Config"** để áp dụng
+  - Cấu hình được lưu trong NVS (Non-Volatile Storage)
+
+#### REST API Endpoints
+
+| Endpoint | Phương thức | Mục đích | Phản hồi |
+|----------|------------|---------|---------|
+| `/` | GET | Trang dashboard HTML | HTML |
+| `/api/sensor` | GET | Lấy dữ liệu sensor | `{"temperature": 25.3, "humidity": 65.0, "status": "NORMAL", ...}` |
+| `/api/buzzer` | GET | Lấy trạng thái buzzer | `{"buzzer_status": "ON/OFF", "is_active": true/false}` |
+| `/api/config` | GET | Lấy cấu hình hiện tại | `{"temp_warning": 20.0, "temp_overheat": 25.0, ...}` |
+| `/api/config` | POST | Cập nhật cấu hình | JSON request body |
+
+#### Ví dụ cURL
+
+```bash
+# Lấy dữ liệu sensor
+curl http://x.x.x.x/api/sensor
+
+# Lấy trạng thái buzzer
+curl http://x.x.x.x/api/buzzer
+
+# Lấy cấu hình
+curl http://x.x.x.x/api/config
+
+# Cập nhật cấu hình
+curl -X POST http://x.x.x.x/api/config \
+  -H "Content-Type: application/json" \
+  -d '{"temp_warning": 30.0, "temp_overheat": 40.0}'
+```
+
+#### Tính năng JavaScript
+- 🔄 Cập nhật dữ liệu **mỗi 2 giây** từ `/api/sensor`
+- 🔄 Cập nhật trạng thái buzzer **mỗi 2 giây** từ `/api/buzzer`
+- ⚡ HTML được tối ưu (minified) để giảm kích thước truyền
+- 📱 Responsive design hoạt động tốt trên di động
+- 🎨 Giao diện tối (dark mode) dễ nhìn
+
 ### Khi nhiệt độ tăng
 
 1. **T ≥ 35°C** (WARNING):
@@ -415,7 +494,17 @@ I (2345) SENSOR: T: 25.4°C, H: 64.8%
 2. **T ≥ 45°C** (OVERHEAT):
    - Màn hình: "Status: OVERHEAT" (đảo màu)
    - LED nhấp nháy nhanh (4Hz)
-   - Buzzer kêu liên tục (tắt sau 5s, bật lại nếu vẫn quá nhiệt)
+   - Buzzer:
+     - Kêu ngay khi T ≥ 45°C
+     - Tự động tắt sau **10 giây**
+     - **Ví dụ**: Kêu lần 1 → tắt → lần 2 T vẫn ≥ 45°C → kêu lại → tắt → ...
+     - Nếu T < 45°C trước khi hết 10 giây: Buzzer sẽ dừng lại (không kêu tiếp)
+     - Nếu T lại ≥ 45°C sau khi hạ xuống: Sẽ kêu lại từ đầu (chu kỳ mới)
+
+
+### Result
+
+Kết quả webserver: ./docs/result.png
 
 ### Debug & Monitoring
 
@@ -612,19 +701,7 @@ bh1750_read(&dev, &lux);
 ESP_LOGI(TAG, "Light: %.1f lux", lux);
 ```
 
-### 4. Web Server
-```c
-#include "esp_http_server.h"
 
-// ESP32 Web Server để xem dữ liệu
-esp_err_t root_handler(httpd_req_t *req) {
-    char resp[128];
-    snprintf(resp, sizeof(resp), 
-             "<h1>Temperature: %.1f°C</h1>", last_temp);
-    httpd_resp_send(req, resp, HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
-}
-```
 
 ---
 
@@ -708,6 +785,7 @@ idf.py -p /dev/ttyUSB0 monitor -b 115200
 
 ---
 
+
 ## 📚 Tài liệu tham khảo
 
 - [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/)
@@ -724,7 +802,5 @@ idf.py -p /dev/ttyUSB0 monitor -b 115200
 - **Nhóm Mephisto**
 - Học kỳ 9 - 2025
 - Trường: Đại học Bách khoa - Đại học Đà Nẵng
-
-
 
 

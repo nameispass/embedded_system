@@ -42,10 +42,21 @@
 #define OLED_WIDTH              128
 #define OLED_HEIGHT             64
 
+// ==================== WiFi CONFIGURATION ====================
+#define WIFI_SSID               "JuXiao"          // Thay đổi SSID WiFi
+#define WIFI_PASSWORD           "68686800"      // Thay đổi mật khẩu WiFi
+#define WIFI_MAXIMUM_RETRY      5                    // Số lần thử kết nối tối đa
+#define WIFI_CONNECTED_BIT      BIT0
+#define WIFI_FAIL_BIT           BIT1
+
+// ==================== HTTP SERVER CONFIGURATION ====================
+#define HTTP_SERVER_PORT        80                   // Port HTTP (80)
+#define ENABLE_WEBSERVER        1                    // Bật/tắt webserver (1=ON, 0=OFF)
+
 // ==================== SYSTEM THRESHOLDS ====================
-#define TEMP_NORMAL     35.0f   // Ngưỡng nhiệt độ bình thường (°C)
-#define TEMP_WARNING    35.0f   // Ngưỡng cảnh báo (°C)
-#define TEMP_OVERHEAT   45.0f   // Ngưỡng quá nhiệt (°C)
+#define TEMP_NORMAL     20.0f   // Ngưỡng nhiệt độ bình thường (°C)
+#define TEMP_WARNING    20.0f   // Ngưỡng cảnh báo (°C)
+#define TEMP_OVERHEAT   26.0f   // Ngưỡng quá nhiệt (°C)
 
 #define HUMIDITY_MIN    30.0f   // Độ ẩm tối thiểu (%)
 #define HUMIDITY_MAX    80.0f   // Độ ẩm tối đa (%)
@@ -138,6 +149,7 @@ void buzzer_timer_callback(TimerHandle_t xTimer);
 // Helper Functions
 system_state_t get_system_state(float temperature);
 const char* get_state_string(system_state_t state);
+bool get_buzzer_status(void);
 void update_system_state(float temperature);
 void activate_buzzer(bool enable);
 void update_led(system_state_t state);
