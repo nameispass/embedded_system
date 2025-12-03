@@ -504,7 +504,7 @@ curl -X POST http://x.x.x.x/api/config \
 
 ### Result
 
-Kết quả webserver: ./docs/result.png
+![Kết quả webserver:](docs/result.png)
 
 ### Debug & Monitoring
 
@@ -802,5 +802,6 @@ idf.py -p /dev/ttyUSB0 monitor -b 115200
 - **Nhóm Mephisto**
 - Học kỳ 9 - 2025
 - Trường: Đại học Bách khoa - Đại học Đà Nẵng
+
 
 
